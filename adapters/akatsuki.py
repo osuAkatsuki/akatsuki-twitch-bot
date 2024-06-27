@@ -1,2 +1,2 @@
-def send_message() -> str:
+def send_message() -> None:
     pass
