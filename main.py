@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from twitchio.ext import commands
-from config import config
 
 from cogs.requests import Requests
+
+import config
+
 
 class Bot(commands.Bot):
     def __init__(self) -> Bot:
         super().__init__(
-            token=config["twitch"]["access_token"], 
-            prefix=config["twitch"]["command_prefix"], 
-            initial_channels=['henryosu'] 
+            token=config.TWITCH_ACCESS_TOKEN,
+            prefix=config.TWITCH_COMMAND_PREFIX,
+            initial_channels=["henryosu"],
             # TODO: maybe initially load linked channels once we get twitch/akat account linking sorted?
         )
 
@@ -20,10 +22,12 @@ class Bot(commands.Bot):
         # print(f"User ID: {self.user_id}")
         pass
 
+
 def main() -> None:
     bot = Bot()
     bot.add_cog(Requests(bot))
-    bot.run() 
+    bot.run()
+
 
 if __name__ == "__main__":
     main()
