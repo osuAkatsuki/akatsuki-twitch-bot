@@ -31,4 +31,4 @@ WORKDIR /srv/root
 EXPOSE 80
 
 # Set the entry point for the container
-ENTRYPOINT ["/scripts/run-bot.sh"]
+ENTRYPOINT ["/scripts/bootstrap.sh"]
