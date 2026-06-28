@@ -14,3 +14,7 @@ APP_COMPONENT=bot ./scripts/bootstrap.sh
 
 Required production secrets live under the `akatsuki-twitch-bot` Vault service.
 See `.env.example` for the expected keys.
+
+Production deploys build `ghcr.io/osuakatsuki/akatsuki-twitch-bot` and restart
+the `akatsuki-twitch-bot` service in `/opt/akatsuki/docker-compose.yml` on the
+production host.
