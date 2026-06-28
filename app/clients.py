@@ -22,16 +22,41 @@ class TwitchApiClient:
         self._app_access_token: str | None = None
         self._app_access_token_expires_at = 0.0
 
-    async def fetch_live_channels(self, logins: list[str]) -> set[str]:
-        if not logins:
-            return set()
+    async def fetch_user_logins_by_id(self, user_ids: list[str]) -> dict[str, str]:
+        if not user_ids:
+            return {}
 
         token = await self._get_app_access_token()
-        live_channels: set[str] = set()
-        for chunk in _chunks(logins, 100):
+        logins_by_id: dict[str, str] = {}
+        for chunk in _chunks(user_ids, 100):
+            response = await self.http_client.get(
+                "https://api.twitch.tv/helix/users",
+                params={"id": chunk},
+                headers={
+                    "Authorization": f"Bearer {token}",
+                    "Client-Id": self.client_id,
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+            for user in payload.get("data", []):
+                logins_by_id[str(user["id"])] = str(user["login"]).lower()
+
+        return logins_by_id
+
+    async def fetch_live_channel_logins_by_id(
+        self,
+        user_ids: list[str],
+    ) -> dict[str, str]:
+        if not user_ids:
+            return {}
+
+        token = await self._get_app_access_token()
+        logins_by_id: dict[str, str] = {}
+        for chunk in _chunks(user_ids, 100):
             response = await self.http_client.get(
                 "https://api.twitch.tv/helix/streams",
-                params={"user_login": chunk},
+                params={"user_id": chunk},
                 headers={
                     "Authorization": f"Bearer {token}",
                     "Client-Id": self.client_id,
@@ -41,9 +66,11 @@ class TwitchApiClient:
             payload = response.json()
             for stream in payload.get("data", []):
                 if stream.get("type") == "live":
-                    live_channels.add(str(stream["user_login"]).lower())
+                    logins_by_id[str(stream["user_id"])] = str(
+                        stream["user_login"],
+                    ).lower()
 
-        return live_channels
+        return logins_by_id
 
     async def _get_app_access_token(self) -> str:
         if (

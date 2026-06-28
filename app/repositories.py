@@ -57,11 +57,9 @@ class AkatsukiUsersRepository:
                         id,
                         username,
                         twitch_account_id,
-                        twitch_username,
-                        twitch_display_name
+                        twitch_username
                     FROM users
                     WHERE twitch_account_id IS NOT NULL
-                      AND twitch_username IS NOT NULL
                     """,
                 )
                 rows = await cursor.fetchall()
@@ -71,10 +69,23 @@ class AkatsukiUsersRepository:
                 user_id=int(row["id"]),
                 username=str(row["username"]),
                 twitch_account_id=str(row["twitch_account_id"]),
-                twitch_username=str(row["twitch_username"]),
-                twitch_display_name=str(
-                    row["twitch_display_name"] or row["twitch_username"],
-                ),
+                twitch_username=str(row["twitch_username"] or ""),
             )
             for row in rows
         ]
+
+    async def update_twitch_username(
+        self,
+        *,
+        user_id: int,
+        twitch_username: str,
+    ) -> None:
+        if self._pool is None:
+            raise RuntimeError("Repository is not connected.")
+
+        async with self._pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute(
+                    "UPDATE users SET twitch_username = %s WHERE id = %s",
+                    (twitch_username, user_id),
+                )

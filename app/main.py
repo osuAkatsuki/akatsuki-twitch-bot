@@ -51,22 +51,30 @@ class AkatsukiTwitchBot:
         while True:
             try:
                 streamers = await self.users.fetch_linked_streamers()
-                streamers_by_login = {
-                    streamer.twitch_login: streamer for streamer in streamers
+                streamers_by_twitch_id = {
+                    streamer.twitch_account_id: streamer for streamer in streamers
                 }
-                linked_logins = sorted(streamers_by_login)
+                linked_twitch_ids = sorted(streamers_by_twitch_id)
                 if settings.TWITCH_REQUIRE_STREAM_ONLINE:
-                    active_logins = await self.twitch_api.fetch_live_channels(
-                        linked_logins,
+                    logins_by_id = (
+                        await self.twitch_api.fetch_live_channel_logins_by_id(
+                            linked_twitch_ids,
+                        )
                     )
                 else:
-                    active_logins = set(linked_logins)
+                    logins_by_id = await self.twitch_api.fetch_user_logins_by_id(
+                        linked_twitch_ids,
+                    )
 
                 active_streamers = {
-                    login: streamers_by_login[login]
-                    for login in active_logins
-                    if login in streamers_by_login
+                    login: streamers_by_twitch_id[twitch_id]
+                    for twitch_id, login in logins_by_id.items()
+                    if twitch_id in streamers_by_twitch_id
                 }
+                await self._update_cached_twitch_usernames(
+                    streamers_by_twitch_id=streamers_by_twitch_id,
+                    logins_by_id=logins_by_id,
+                )
                 async with self._streamers_lock:
                     self._streamers_by_channel = active_streamers
 
@@ -74,7 +82,7 @@ class AkatsukiTwitchBot:
                 log.info(
                     "Synced Twitch channels.",
                     extra={
-                        "linked_channels": len(linked_logins),
+                        "linked_channels": len(linked_twitch_ids),
                         "active_channels": len(active_streamers),
                     },
                 )
@@ -84,6 +92,22 @@ class AkatsukiTwitchBot:
                 log.exception("Failed to sync Twitch channels.")
 
             await asyncio.sleep(settings.TWITCH_POLL_INTERVAL_SECONDS)
+
+    async def _update_cached_twitch_usernames(
+        self,
+        *,
+        streamers_by_twitch_id: dict[str, LinkedStreamer],
+        logins_by_id: dict[str, str],
+    ) -> None:
+        for twitch_id, login in logins_by_id.items():
+            streamer = streamers_by_twitch_id.get(twitch_id)
+            if streamer is None or streamer.twitch_login == login:
+                continue
+
+            await self.users.update_twitch_username(
+                user_id=streamer.user_id,
+                twitch_username=login,
+            )
 
     async def _handle_chat_message(self, message: TwitchChatMessage) -> None:
         async with self._streamers_lock:

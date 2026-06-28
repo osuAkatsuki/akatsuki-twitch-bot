@@ -9,7 +9,6 @@ class LinkedStreamer:
     username: str
     twitch_account_id: str
     twitch_username: str
-    twitch_display_name: str
 
     @property
     def twitch_login(self) -> str:
