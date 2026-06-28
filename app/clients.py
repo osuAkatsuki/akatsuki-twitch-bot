@@ -76,20 +76,17 @@ class TwitchBotTokenProvider:
         client_id: str,
         client_secret: str,
         access_token: str,
-        refresh_token: str | None,
+        refresh_token: str,
     ) -> None:
         self.http_client = http_client
         self.client_id = client_id
         self.client_secret = client_secret
         self._access_token = access_token
         self._refresh_token = refresh_token
-        self._access_token_expires_at = 0.0 if refresh_token else float("inf")
+        self._access_token_expires_at = 0.0
 
     async def get_access_token(self) -> str:
-        if (
-            self._refresh_token is None
-            or time.monotonic() < self._access_token_expires_at - 60
-        ):
+        if time.monotonic() < self._access_token_expires_at - 60:
             return self._access_token
 
         response = await self.http_client.post(
