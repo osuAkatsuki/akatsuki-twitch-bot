@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+
+import httpx
+
+from app.clients import TwitchBotTokenProvider
 from app.irc import parse_privmsg
 from app.map_requests.formatting import format_map_request_message
 from app.map_requests.link_parser import extract_beatmap_links
@@ -58,3 +63,39 @@ def test_formats_osu_chat_link() -> None:
         message
         == "Twitch request from requester: [https://osu.ppy.sh/b/75 Artist - Title [Hard]]"
     )
+
+
+def test_twitch_bot_token_provider_refreshes_user_access_token() -> None:
+    async def run() -> None:
+        requests: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            requests.append(request)
+            return httpx.Response(
+                200,
+                json={
+                    "access_token": "refreshed-access-token",
+                    "refresh_token": "refreshed-refresh-token",
+                    "expires_in": 3600,
+                },
+            )
+
+        transport = httpx.MockTransport(handler)
+        async with httpx.AsyncClient(transport=transport) as http_client:
+            provider = TwitchBotTokenProvider(
+                http_client,
+                client_id="client-id",
+                client_secret="client-secret",
+                access_token="expired-access-token",
+                refresh_token="initial-refresh-token",
+            )
+
+            assert await provider.get_access_token() == "refreshed-access-token"
+            assert await provider.get_access_token() == "refreshed-access-token"
+
+        assert len(requests) == 1
+        body = requests[0].content.decode()
+        assert "grant_type=refresh_token" in body
+        assert "refresh_token=initial-refresh-token" in body
+
+    asyncio.run(run())

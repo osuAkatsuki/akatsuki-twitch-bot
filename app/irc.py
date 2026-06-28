@@ -4,6 +4,8 @@ import asyncio
 import logging
 import ssl
 from collections.abc import AsyncIterator
+from collections.abc import Callable
+from collections.abc import Awaitable
 
 from app.models import TwitchChatMessage
 
@@ -15,11 +17,11 @@ class TwitchIrcClient:
         self,
         *,
         username: str,
-        oauth_token: str,
+        access_token_provider: Callable[[], Awaitable[str]],
         reconnect_seconds: int,
     ) -> None:
         self.username = username.lower()
-        self.oauth_token = _normalize_oauth_token(oauth_token)
+        self.access_token_provider = access_token_provider
         self.reconnect_seconds = reconnect_seconds
         self._reader: asyncio.StreamReader | None = None
         self._writer: asyncio.StreamWriter | None = None
@@ -71,13 +73,14 @@ class TwitchIrcClient:
 
     async def _connect(self) -> None:
         log.info("Connecting to Twitch IRC.")
+        access_token = await self.access_token_provider()
         context = ssl.create_default_context()
         self._reader, self._writer = await asyncio.open_connection(
             "irc.chat.twitch.tv",
             6697,
             ssl=context,
         )
-        await self._send(f"PASS {self.oauth_token}")
+        await self._send(f"PASS {_normalize_oauth_token(access_token)}")
         await self._send(f"NICK {self.username}")
         await self._send("CAP REQ :twitch.tv/commands")
         self._joined_channels.clear()

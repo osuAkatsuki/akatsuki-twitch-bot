@@ -68,6 +68,50 @@ class TwitchApiClient:
         return self._app_access_token
 
 
+class TwitchBotTokenProvider:
+    def __init__(
+        self,
+        http_client: httpx.AsyncClient,
+        *,
+        client_id: str,
+        client_secret: str,
+        access_token: str,
+        refresh_token: str | None,
+    ) -> None:
+        self.http_client = http_client
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self._access_token = access_token
+        self._refresh_token = refresh_token
+        self._access_token_expires_at = 0.0 if refresh_token else float("inf")
+
+    async def get_access_token(self) -> str:
+        if (
+            self._refresh_token is None
+            or time.monotonic() < self._access_token_expires_at - 60
+        ):
+            return self._access_token
+
+        response = await self.http_client.post(
+            "https://id.twitch.tv/oauth2/token",
+            data={
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+                "grant_type": "refresh_token",
+                "refresh_token": self._refresh_token,
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
+        self._access_token = str(payload["access_token"])
+        if payload.get("refresh_token"):
+            self._refresh_token = str(payload["refresh_token"])
+
+        expires_in = int(payload.get("expires_in", 3600))
+        self._access_token_expires_at = time.monotonic() + expires_in
+        return self._access_token
+
+
 class AkatsukiApiClient:
     def __init__(self, http_client: httpx.AsyncClient, *, base_url: str) -> None:
         self.http_client = http_client

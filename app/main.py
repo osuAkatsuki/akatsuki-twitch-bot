@@ -9,6 +9,7 @@ from app import settings
 from app.clients import AkatsukiApiClient
 from app.clients import BanchoServiceClient
 from app.clients import TwitchApiClient
+from app.clients import TwitchBotTokenProvider
 from app.irc import TwitchIrcClient
 from app.map_requests import TwitchMapRequestFeature
 from app.map_requests.formatting import format_map_request_message
@@ -123,6 +124,13 @@ async def async_main() -> None:
             base_url=settings.BANCHO_SERVICE_BASE_URL,
             api_key=settings.BANCHO_SERVICE_API_KEY,
         )
+        twitch_bot_token_provider = TwitchBotTokenProvider(
+            http_client,
+            client_id=settings.TWITCH_CLIENT_ID,
+            client_secret=settings.TWITCH_CLIENT_SECRET,
+            access_token=settings.TWITCH_BOT_OAUTH_TOKEN,
+            refresh_token=settings.TWITCH_BOT_REFRESH_TOKEN,
+        )
         bot = AkatsukiTwitchBot(
             users=users,
             twitch_api=TwitchApiClient(
@@ -132,7 +140,7 @@ async def async_main() -> None:
             ),
             twitch_irc=TwitchIrcClient(
                 username=settings.TWITCH_BOT_USERNAME,
-                oauth_token=settings.TWITCH_BOT_OAUTH_TOKEN,
+                access_token_provider=twitch_bot_token_provider.get_access_token,
                 reconnect_seconds=settings.TWITCH_RECONNECT_SECONDS,
             ),
             map_requests=TwitchMapRequestFeature(
