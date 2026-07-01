@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import Any
-from typing import cast
+from collections.abc import AsyncIterator
 
 import pytest
 
@@ -39,16 +38,31 @@ class SleepingUsersRepository:
         await asyncio.sleep(3600)
         return []
 
+    async def update_twitch_username(
+        self,
+        *,
+        user_id: int,
+        twitch_username: str,
+    ) -> None:
+        pass
+
 
 class UnusedTwitchApiClient:
-    pass
+    async def fetch_user_logins_by_id(self, user_ids: list[str]) -> dict[str, str]:
+        return {}
+
+    async def fetch_live_channel_logins_by_id(
+        self,
+        user_ids: list[str],
+    ) -> dict[str, str]:
+        return {}
 
 
 class MessageOnlyIrcClient:
     def __init__(self, messages: list[TwitchChatMessage]) -> None:
         self._messages = messages
 
-    async def messages(self) -> Any:
+    async def messages(self) -> AsyncIterator[TwitchChatMessage]:
         for message in self._messages:
             yield message
             await asyncio.sleep(0)
@@ -77,18 +91,15 @@ def test_chat_message_handling_does_not_block_irc_reader() -> None:
     async def run() -> None:
         map_requests = BlockingMapRequests()
         bot = AkatsukiTwitchBot(
-            users=cast(Any, SleepingUsersRepository()),
-            twitch_api=cast(Any, UnusedTwitchApiClient()),
-            twitch_irc=cast(
-                Any,
-                MessageOnlyIrcClient(
-                    [
-                        TwitchChatMessage("streamer", "requester", "first"),
-                        TwitchChatMessage("streamer", "requester", "second"),
-                    ],
-                ),
+            users=SleepingUsersRepository(),
+            twitch_api=UnusedTwitchApiClient(),
+            twitch_irc=MessageOnlyIrcClient(
+                [
+                    TwitchChatMessage("streamer", "requester", "first"),
+                    TwitchChatMessage("streamer", "requester", "second"),
+                ],
             ),
-            map_requests=cast(Any, map_requests),
+            map_requests=map_requests,
             max_chat_message_tasks=2,
         )
         bot._streamers_by_channel = {
@@ -111,18 +122,15 @@ def test_chat_message_handling_drops_messages_when_backlog_is_full() -> None:
     async def run() -> None:
         map_requests = BlockingMapRequests()
         bot = AkatsukiTwitchBot(
-            users=cast(Any, SleepingUsersRepository()),
-            twitch_api=cast(Any, UnusedTwitchApiClient()),
-            twitch_irc=cast(
-                Any,
-                MessageOnlyIrcClient(
-                    [
-                        TwitchChatMessage("streamer", "requester", "first"),
-                        TwitchChatMessage("streamer", "requester", "second"),
-                    ],
-                ),
+            users=SleepingUsersRepository(),
+            twitch_api=UnusedTwitchApiClient(),
+            twitch_irc=MessageOnlyIrcClient(
+                [
+                    TwitchChatMessage("streamer", "requester", "first"),
+                    TwitchChatMessage("streamer", "requester", "second"),
+                ],
             ),
-            map_requests=cast(Any, map_requests),
+            map_requests=map_requests,
             max_chat_message_tasks=1,
         )
         bot._streamers_by_channel = {
@@ -142,8 +150,14 @@ def test_chat_message_handling_drops_messages_when_backlog_is_full() -> None:
 
 
 def test_irc_send_times_out_when_writer_drain_stalls() -> None:
-    class StalledWriter:
-        def write(self, data: bytes) -> None:
+    class StalledWriter(asyncio.StreamWriter):
+        def __init__(self) -> None:
+            pass
+
+        def __del__(self) -> None:
+            pass
+
+        def write(self, data: bytes | bytearray | memoryview[int]) -> None:
             pass
 
         async def drain(self) -> None:
@@ -156,7 +170,7 @@ def test_irc_send_times_out_when_writer_drain_stalls() -> None:
             reconnect_seconds=1,
             write_timeout_seconds=0.001,
         )
-        client._writer = cast(Any, StalledWriter())
+        client._writer = StalledWriter()
 
         with pytest.raises(asyncio.TimeoutError):
             await client._send("PONG :tmi.twitch.tv")

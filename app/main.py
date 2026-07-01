@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator
+from typing import Protocol
 
 import httpx
 
@@ -25,14 +27,49 @@ log = logging.getLogger(__name__)
 MAX_CHAT_MESSAGE_TASKS = 32
 
 
+class UsersRepository(Protocol):
+    async def fetch_linked_streamers(self) -> list[LinkedStreamer]: ...
+
+    async def update_twitch_username(
+        self,
+        *,
+        user_id: int,
+        twitch_username: str,
+    ) -> None: ...
+
+
+class TwitchApi(Protocol):
+    async def fetch_user_logins_by_id(self, user_ids: list[str]) -> dict[str, str]: ...
+
+    async def fetch_live_channel_logins_by_id(
+        self,
+        user_ids: list[str],
+    ) -> dict[str, str]: ...
+
+
+class TwitchIrc(Protocol):
+    def messages(self) -> AsyncIterator[TwitchChatMessage]: ...
+
+    async def sync_channels(self, channels: set[str]) -> None: ...
+
+
+class MapRequestHandler(Protocol):
+    async def handle_chat_message(
+        self,
+        *,
+        streamer: LinkedStreamer,
+        message: TwitchChatMessage,
+    ) -> None: ...
+
+
 class AkatsukiTwitchBot:
     def __init__(
         self,
         *,
-        users: AkatsukiUsersRepository,
-        twitch_api: TwitchApiClient,
-        twitch_irc: TwitchIrcClient,
-        map_requests: TwitchMapRequestFeature,
+        users: UsersRepository,
+        twitch_api: TwitchApi,
+        twitch_irc: TwitchIrc,
+        map_requests: MapRequestHandler,
         max_chat_message_tasks: int = MAX_CHAT_MESSAGE_TASKS,
     ) -> None:
         self.users = users
