@@ -22,6 +22,8 @@ from app.repositories import AkatsukiUsersRepository
 
 log = logging.getLogger(__name__)
 
+MAX_CHAT_MESSAGE_TASKS = 32
+
 
 class AkatsukiTwitchBot:
     def __init__(
@@ -31,22 +33,50 @@ class AkatsukiTwitchBot:
         twitch_api: TwitchApiClient,
         twitch_irc: TwitchIrcClient,
         map_requests: TwitchMapRequestFeature,
+        max_chat_message_tasks: int = MAX_CHAT_MESSAGE_TASKS,
     ) -> None:
         self.users = users
         self.twitch_api = twitch_api
         self.twitch_irc = twitch_irc
         self.map_requests = map_requests
+        self.max_chat_message_tasks = max_chat_message_tasks
         self._streamers_by_channel: dict[str, LinkedStreamer] = {}
         self._streamers_lock = asyncio.Lock()
+        self._message_tasks: set[asyncio.Task[None]] = set()
 
     async def run(self) -> None:
         sync_task = asyncio.create_task(self._sync_live_channels())
         try:
             async for chat_message in self.twitch_irc.messages():
-                await self._handle_chat_message(chat_message)
+                self._schedule_chat_message(chat_message)
         finally:
             sync_task.cancel()
-            await asyncio.gather(sync_task, return_exceptions=True)
+            message_tasks = tuple(self._message_tasks)
+            for task in message_tasks:
+                task.cancel()
+
+            await asyncio.gather(
+                sync_task,
+                *message_tasks,
+                return_exceptions=True,
+            )
+
+    def _schedule_chat_message(self, message: TwitchChatMessage) -> None:
+        if len(self._message_tasks) >= self.max_chat_message_tasks:
+            log.warning(
+                "Dropped Twitch chat message.",
+                extra={
+                    "reason": "message_handler_backlog_full",
+                    "channel": message.channel,
+                    "author": message.author,
+                    "pending_message_handlers": len(self._message_tasks),
+                },
+            )
+            return
+
+        task = asyncio.create_task(self._handle_chat_message(message))
+        self._message_tasks.add(task)
+        task.add_done_callback(self._message_tasks.discard)
 
     async def _sync_live_channels(self) -> None:
         while True:
