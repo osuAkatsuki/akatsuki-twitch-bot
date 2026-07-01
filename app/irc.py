@@ -4,8 +4,8 @@ import asyncio
 import logging
 import ssl
 from collections.abc import AsyncIterator
-from collections.abc import Callable
 from collections.abc import Awaitable
+from collections.abc import Callable
 
 from app.models import TwitchChatMessage
 
@@ -19,10 +19,12 @@ class TwitchIrcClient:
         username: str,
         access_token_provider: Callable[[], Awaitable[str]],
         reconnect_seconds: int,
+        write_timeout_seconds: float = 5.0,
     ) -> None:
         self.username = username.lower()
         self.access_token_provider = access_token_provider
         self.reconnect_seconds = reconnect_seconds
+        self.write_timeout_seconds = write_timeout_seconds
         self._reader: asyncio.StreamReader | None = None
         self._writer: asyncio.StreamWriter | None = None
         self._write_lock = asyncio.Lock()
@@ -103,7 +105,10 @@ class TwitchIrcClient:
 
         async with self._write_lock:
             self._writer.write(f"{line}\r\n".encode())
-            await self._writer.drain()
+            await asyncio.wait_for(
+                self._writer.drain(),
+                timeout=self.write_timeout_seconds,
+            )
 
 
 def parse_privmsg(line: str) -> TwitchChatMessage | None:
