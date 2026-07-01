@@ -64,12 +64,12 @@ class TwitchIrcClient:
         for channel in sorted(channels - self._joined_channels):
             await self._send(f"JOIN #{channel}")
             self._joined_channels.add(channel)
-            log.info("Joined Twitch channel #%s.", channel)
+            log.info("Joined Twitch channel.", extra={"channel": channel})
 
         for channel in sorted(self._joined_channels - channels):
             await self._send(f"PART #{channel}")
             self._joined_channels.remove(channel)
-            log.info("Parted Twitch channel #%s.", channel)
+            log.info("Parted Twitch channel.", extra={"channel": channel})
 
     async def _connect(self) -> None:
         log.info("Connecting to Twitch IRC.")

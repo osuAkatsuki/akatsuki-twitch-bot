@@ -1,3 +1,5 @@
 aiomysql
 httpx
+python-json-logger
 python-dotenv
+pyyaml

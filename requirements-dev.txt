@@ -3,3 +3,4 @@ mypy
 pre-commit
 pytest
 reorder-python-imports
+types-PyYAML
