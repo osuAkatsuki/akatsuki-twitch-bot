@@ -80,11 +80,9 @@ class AkatsukiTwitchBot:
 
                 await self.twitch_irc.sync_channels(set(active_streamers))
                 log.info(
-                    "Synced Twitch channels.",
-                    extra={
-                        "linked_channels": len(linked_twitch_ids),
-                        "active_channels": len(active_streamers),
-                    },
+                    "Synced Twitch channels: linked=%d active=%d.",
+                    len(linked_twitch_ids),
+                    len(active_streamers),
                 )
             except asyncio.CancelledError:
                 raise
@@ -116,10 +114,19 @@ class AkatsukiTwitchBot:
         if streamer is None:
             return
 
-        await self.map_requests.handle_chat_message(
-            streamer=streamer,
-            message=message,
-        )
+        try:
+            await self.map_requests.handle_chat_message(
+                streamer=streamer,
+                message=message,
+            )
+        except Exception:
+            log.exception(
+                "Failed to handle Twitch chat message: channel=%s author=%s "
+                "akatsuki_user_id=%d.",
+                message.channel,
+                message.author,
+                streamer.user_id,
+            )
 
 
 async def async_main() -> None:
