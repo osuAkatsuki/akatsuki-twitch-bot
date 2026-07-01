@@ -44,9 +44,29 @@ class TwitchMapRequestFeature:
 
         beatmap_link = beatmap_links[0]
         if not self.rate_limiter.can_send(streamer.user_id, beatmap_link.beatmap_id):
+            log.info(
+                "Skipped Twitch beatmap request.",
+                extra={
+                    "reason": "rate_limited",
+                    "channel": message.channel,
+                    "author": message.author,
+                    "akatsuki_user_id": streamer.user_id,
+                    "beatmap_id": beatmap_link.beatmap_id,
+                },
+            )
             return
 
         if not await self.bancho.is_online(streamer.user_id):
+            log.info(
+                "Skipped Twitch beatmap request.",
+                extra={
+                    "reason": "streamer_offline",
+                    "channel": message.channel,
+                    "author": message.author,
+                    "akatsuki_user_id": streamer.user_id,
+                    "beatmap_id": beatmap_link.beatmap_id,
+                },
+            )
             return
 
         beatmap_title = await self.akatsuki_api.fetch_beatmap_title(
@@ -63,7 +83,8 @@ class TwitchMapRequestFeature:
             log.info(
                 "Forwarded Twitch beatmap request.",
                 extra={
-                    "twitch_channel": message.channel,
+                    "channel": message.channel,
+                    "author": message.author,
                     "akatsuki_user_id": streamer.user_id,
                     "beatmap_id": beatmap_link.beatmap_id,
                     "sent_sessions": result.sent_sessions,

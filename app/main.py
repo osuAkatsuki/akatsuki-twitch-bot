@@ -11,6 +11,7 @@ from app.clients import BanchoServiceClient
 from app.clients import TwitchApiClient
 from app.clients import TwitchBotTokenProvider
 from app.irc import TwitchIrcClient
+from app.logger import configure_logging
 from app.map_requests import TwitchMapRequestFeature
 from app.map_requests.formatting import format_map_request_message
 from app.map_requests.link_parser import extract_beatmap_links
@@ -116,17 +117,24 @@ class AkatsukiTwitchBot:
         if streamer is None:
             return
 
-        await self.map_requests.handle_chat_message(
-            streamer=streamer,
-            message=message,
-        )
+        try:
+            await self.map_requests.handle_chat_message(
+                streamer=streamer,
+                message=message,
+            )
+        except Exception:
+            log.exception(
+                "Failed to handle Twitch chat message.",
+                extra={
+                    "channel": message.channel,
+                    "author": message.author,
+                    "akatsuki_user_id": streamer.user_id,
+                },
+            )
 
 
 async def async_main() -> None:
-    logging.basicConfig(
-        level=getattr(logging, settings.LOG_LEVEL.upper()),
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    )
+    configure_logging(settings.LOG_LEVEL)
 
     users = AkatsukiUsersRepository(
         host=settings.DB_HOST,
