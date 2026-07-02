@@ -77,7 +77,7 @@ class AkatsukiTwitchBot:
         self.twitch_irc = twitch_irc
         self.map_requests = map_requests
         self.max_chat_message_tasks = max_chat_message_tasks
-        self._streamers_by_channel: dict[str, LinkedStreamer] = {}
+        self._streamers_by_channel: dict[str, tuple[LinkedStreamer, ...]] = {}
         self._streamers_lock = asyncio.Lock()
         self._message_tasks: set[asyncio.Task[None]] = set()
 
@@ -119,9 +119,12 @@ class AkatsukiTwitchBot:
         while True:
             try:
                 streamers = await self.users.fetch_linked_streamers()
-                streamers_by_twitch_id = {
-                    streamer.twitch_account_id: streamer for streamer in streamers
-                }
+                streamers_by_twitch_id: dict[str, list[LinkedStreamer]] = {}
+                for streamer in streamers:
+                    streamers_by_twitch_id.setdefault(
+                        streamer.twitch_account_id,
+                        [],
+                    ).append(streamer)
                 linked_twitch_ids = sorted(streamers_by_twitch_id)
                 if settings.TWITCH_REQUIRE_STREAM_ONLINE:
                     logins_by_id = (
@@ -135,7 +138,7 @@ class AkatsukiTwitchBot:
                     )
 
                 active_streamers = {
-                    login: streamers_by_twitch_id[twitch_id]
+                    login: tuple(streamers_by_twitch_id[twitch_id])
                     for twitch_id, login in logins_by_id.items()
                     if twitch_id in streamers_by_twitch_id
                 }
@@ -164,40 +167,45 @@ class AkatsukiTwitchBot:
     async def _update_cached_twitch_usernames(
         self,
         *,
-        streamers_by_twitch_id: dict[str, LinkedStreamer],
+        streamers_by_twitch_id: dict[str, list[LinkedStreamer]],
         logins_by_id: dict[str, str],
     ) -> None:
         for twitch_id, login in logins_by_id.items():
-            streamer = streamers_by_twitch_id.get(twitch_id)
-            if streamer is None or streamer.twitch_login == login:
+            streamers = streamers_by_twitch_id.get(twitch_id, [])
+            if not streamers:
                 continue
 
-            await self.users.update_twitch_username(
-                user_id=streamer.user_id,
-                twitch_username=login,
-            )
+            for streamer in streamers:
+                if streamer.twitch_login == login:
+                    continue
+
+                await self.users.update_twitch_username(
+                    user_id=streamer.user_id,
+                    twitch_username=login,
+                )
 
     async def _handle_chat_message(self, message: TwitchChatMessage) -> None:
         async with self._streamers_lock:
-            streamer = self._streamers_by_channel.get(message.channel)
+            streamers = self._streamers_by_channel.get(message.channel, ())
 
-        if streamer is None:
+        if not streamers:
             return
 
-        try:
-            await self.map_requests.handle_chat_message(
-                streamer=streamer,
-                message=message,
-            )
-        except Exception:
-            log.exception(
-                "Failed to handle Twitch chat message.",
-                extra={
-                    "channel": message.channel,
-                    "author": message.author,
-                    "akatsuki_user_id": streamer.user_id,
-                },
-            )
+        for streamer in streamers:
+            try:
+                await self.map_requests.handle_chat_message(
+                    streamer=streamer,
+                    message=message,
+                )
+            except Exception:
+                log.exception(
+                    "Failed to handle Twitch chat message.",
+                    extra={
+                        "channel": message.channel,
+                        "author": message.author,
+                        "akatsuki_user_id": streamer.user_id,
+                    },
+                )
 
 
 async def async_main() -> None:
