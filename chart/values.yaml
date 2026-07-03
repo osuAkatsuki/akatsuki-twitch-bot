@@ -5,7 +5,7 @@ apps:
     replicaCount: 1
     container:
       image:
-        repository: osuakatsuki/akatsuki-twitch-bot
+        repository: ghcr.io/osuakatsuki/akatsuki-twitch-bot
         tag: latest
       port: 80
       resources:
