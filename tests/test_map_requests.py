@@ -17,7 +17,13 @@ def test_extracts_osu_and_akatsuki_beatmap_links() -> None:
         "try https://osu.ppy.sh/beatmapsets/1#osu/75 " "or https://akatsuki.gg/b/100."
     )
 
-    assert [link.beatmap_id for link in extract_beatmap_links(text)] == [75, 100]
+    links = extract_beatmap_links(text)
+
+    assert [link.beatmap_id for link in links] == [75, 100]
+    assert [link.url for link in links] == [
+        "https://akatsuki.gg/b/75",
+        "https://akatsuki.gg/b/100",
+    ]
 
 
 def test_ignores_mapset_links_without_specific_beatmap() -> None:
@@ -53,7 +59,7 @@ def test_parse_twitch_privmsg_with_tags() -> None:
     assert message.text == "https://osu.ppy.sh/b/75"
 
 
-def test_formats_osu_chat_link() -> None:
+def test_formats_akatsuki_chat_link() -> None:
     message = format_map_request_message(
         twitch_author="requester",
         beatmap_id=75,
@@ -62,7 +68,7 @@ def test_formats_osu_chat_link() -> None:
 
     assert (
         message
-        == "Twitch request from requester: [https://osu.ppy.sh/b/75 Artist - Title [Hard]]"
+        == "Twitch request from requester: [https://akatsuki.gg/b/75 Artist - Title [Hard]]"
     )
 
 
