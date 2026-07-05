@@ -27,7 +27,7 @@ def extract_beatmap_links(text: str) -> list[BeatmapLink]:
         links.append(
             BeatmapLink(
                 beatmap_id=beatmap_id,
-                url=f"https://osu.ppy.sh/b/{beatmap_id}",
+                url=f"https://akatsuki.gg/b/{beatmap_id}",
             ),
         )
 

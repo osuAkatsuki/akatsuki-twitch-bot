@@ -12,7 +12,7 @@ def format_map_request_message(
     title = _sanitize_link_text(beatmap_title or "beatmap")
     author = twitch_author[:25]
     message = (
-        f"Twitch request from {author}: [https://osu.ppy.sh/b/{beatmap_id} {title}]"
+        f"Twitch request from {author}: [https://akatsuki.gg/b/{beatmap_id} {title}]"
     )
     return message[:MAX_OSU_CHAT_MESSAGE_LENGTH]
 
