@@ -22,7 +22,7 @@ class TwitchMapRequestFeature:
         rate_limiter: RequestRateLimiter,
         extract_beatmap_links: Callable[[str], list[BeatmapLink]],
         format_map_request_message: Callable[
-            [str, int, str | None],
+            [str, int, int | None, str | None],
             str,
         ],
     ) -> None:
@@ -69,12 +69,19 @@ class TwitchMapRequestFeature:
             )
             return
 
-        beatmap_title = await self.akatsuki_api.fetch_beatmap_title(
+        beatmap_metadata = await self.akatsuki_api.fetch_beatmap_metadata(
             beatmap_link.beatmap_id,
         )
+        beatmapset_id = beatmap_link.beatmapset_id
+        beatmap_title = None
+        if beatmap_metadata is not None:
+            beatmapset_id = beatmap_metadata.beatmapset_id or beatmapset_id
+            beatmap_title = beatmap_metadata.title
+
         dm = self.format_map_request_message(
             message.author,
             beatmap_link.beatmap_id,
+            beatmapset_id,
             beatmap_title,
         )
         result = await self.bancho.send_aika_dm(user_id=streamer.user_id, message=dm)
