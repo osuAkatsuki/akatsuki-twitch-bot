@@ -5,6 +5,7 @@ from typing import Any
 
 import httpx
 
+from app.models import BeatmapMetadata
 from app.models import DirectMessageResult
 
 
@@ -141,7 +142,7 @@ class AkatsukiApiClient:
         self.http_client = http_client
         self.base_url = base_url
 
-    async def fetch_beatmap_title(self, beatmap_id: int) -> str | None:
+    async def fetch_beatmap_metadata(self, beatmap_id: int) -> BeatmapMetadata | None:
         response = await self.http_client.get(
             f"{self.base_url}/api/v1/beatmaps",
             params={"b": beatmap_id},
@@ -151,7 +152,11 @@ class AkatsukiApiClient:
 
         response.raise_for_status()
         payload = response.json()
-        return _optional_str(payload.get("song_name"))
+        return BeatmapMetadata(
+            beatmap_id=beatmap_id,
+            beatmapset_id=_optional_int(payload.get("beatmapset_id")),
+            title=_optional_str(payload.get("song_name")),
+        )
 
 
 class BanchoServiceClient:
@@ -206,3 +211,12 @@ def _optional_str(value: object) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def _optional_int(value: object) -> int | None:
+    if value is None:
+        return None
+    if not isinstance(value, int | str | float):
+        raise TypeError(f"Expected int-compatible value, got {type(value).__name__}.")
+
+    return int(value)

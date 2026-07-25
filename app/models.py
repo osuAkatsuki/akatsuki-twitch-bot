@@ -19,6 +19,14 @@ class LinkedStreamer:
 class BeatmapLink:
     beatmap_id: int
     url: str
+    beatmapset_id: int | None = None
+
+
+@dataclass(frozen=True)
+class BeatmapMetadata:
+    beatmap_id: int
+    beatmapset_id: int | None
+    title: str | None
 
 
 @dataclass(frozen=True)
